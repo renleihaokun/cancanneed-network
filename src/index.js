@@ -471,9 +471,9 @@ export default {
                   <div class="modal-stats">
                       <div class="stat-item">当前: <b id="stat-curr">--</b> ms</div>
                       <div class="stat-item">平均: <b id="stat-avg">--</b> ms</div>
-                      <div class="stat-item">最大: <b id="stat-max">--</b> ms</div>
-                      <div class="stat-item">最小: <b id="stat-min">--</b> ms</div>
-                      <div class="stat-item" style="margin-left:auto; font-size:0.8em; opacity:0.7">显示最近 200 次记录</div>
+                                          <div class="stat-item">最大: <b id="stat-max">--</b> ms</div>
+                                          <div class="stat-item">最小: <b id="stat-min">--</b> ms</div>
+                                          <div class="stat-item">抖动: <b id="stat-jitter">--</b> ms</div>                      <div class="stat-item" style="margin-left:auto; font-size:0.8em; opacity:0.7">显示最近 200 次记录</div>
                   </div>
               </div>
           </div>
@@ -699,10 +699,18 @@ export default {
                   const max = Math.max(...valid);
                   const avg = Math.round(valid.reduce((a,b)=>a+b,0) / valid.length);
   
+                  // 计算抖动
+                  let sumDiff = 0;
+                  for (let i = 1; i < valid.length; i++) {
+                      sumDiff += Math.abs(valid[i] - valid[i - 1]);
+                  }
+                  const jitter = valid.length > 1 ? Math.round(sumDiff / (valid.length - 1)) : 0;
+  
                   document.getElementById('stat-curr').innerText = lastVal;
                   document.getElementById('stat-avg').innerText = avg;
                   document.getElementById('stat-max').innerText = max;
                   document.getElementById('stat-min').innerText = min;
+                  document.getElementById('stat-jitter').innerText = jitter;
               }
   
               function drawCharts() {
