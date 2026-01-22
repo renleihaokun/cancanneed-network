@@ -1,60 +1,42 @@
-/**
- * @param {Request} request
- * @param {object} env - The environment object containing secrets.
- * @returns {Promise<Response>}
- */
-export default {
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// src/index.js
+var src_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const action = url.searchParams.get('act');
-
-    // === 路由分发 ===
-    
-    // 1. AI 分析接口
-    if (action === 'analyze') {
+    const action = url.searchParams.get("act");
+    if (action === "analyze") {
       return handleAIAnalyze(request, env);
     }
-
-    // 2. Ping 测速接口
-    if (action === 'ping') {
+    if (action === "ping") {
       return handlePing();
     }
-    
-    // 3. 默认：渲染主页面
     return renderHTML(request);
-  },
+  }
 };
-
-// =========================================
-//            后端逻辑处理函数
-// =========================================
-
-/**
- * 处理 AI 分析请求
- */
 async function handleAIAnalyze(request, env) {
   try {
     const userInfo = await request.json();
     const apiKey = env.ZHIPU_API_KEY;
-
     if (!apiKey) {
-      return new Response("服务器未配置 ZHIPU_API_KEY，无法进行AI分析。", { status: 500 });
+      return new Response("\u670D\u52A1\u5668\u672A\u914D\u7F6E ZHIPU_API_KEY\uFF0C\u65E0\u6CD5\u8FDB\u884CAI\u5206\u6790\u3002", { status: 500 });
     }
-
     const zhipuRequest = {
       model: "GLM-4-Flash-250414",
       messages: [
         {
           role: "user",
-          content: `你是一个非常“有梗”的网络分析助手。请根据以下JSON信息，用通俗易懂、极其俏皮的语言，对用户的网络情况进行一段简短的分析和总结。
-          你的分析要“有态度”，可以根据用户的运营商（ISP）给出一些有趣的吐槽。不要使用markdown语法。
-          信息如下：\n\n${JSON.stringify(userInfo, null, 2)}`
+          content: `\u4F60\u662F\u4E00\u4E2A\u975E\u5E38\u201C\u6709\u6897\u201D\u7684\u7F51\u7EDC\u5206\u6790\u52A9\u624B\u3002\u8BF7\u6839\u636E\u4EE5\u4E0BJSON\u4FE1\u606F\uFF0C\u7528\u901A\u4FD7\u6613\u61C2\u3001\u6781\u5176\u4FCF\u76AE\u7684\u8BED\u8A00\uFF0C\u5BF9\u7528\u6237\u7684\u7F51\u7EDC\u60C5\u51B5\u8FDB\u884C\u4E00\u6BB5\u7B80\u77ED\u7684\u5206\u6790\u548C\u603B\u7ED3\u3002
+          \u4F60\u7684\u5206\u6790\u8981\u201C\u6709\u6001\u5EA6\u201D\uFF0C\u53EF\u4EE5\u6839\u636E\u7528\u6237\u7684\u8FD0\u8425\u5546\uFF08ISP\uFF09\u7ED9\u51FA\u4E00\u4E9B\u6709\u8DA3\u7684\u5410\u69FD\u3002\u4E0D\u8981\u4F7F\u7528markdown\u8BED\u6CD5\u3002
+          \u4FE1\u606F\u5982\u4E0B\uFF1A
+
+${JSON.stringify(userInfo, null, 2)}`
         }
       ],
       stream: true,
-      temperature: 1.0,
+      temperature: 1
     };
-
     const zhipuResponse = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
       method: "POST",
       headers: {
@@ -63,35 +45,29 @@ async function handleAIAnalyze(request, env) {
       },
       body: JSON.stringify(zhipuRequest)
     });
-
     if (!zhipuResponse.ok) {
-        const errorText = await zhipuResponse.text();
-        throw new Error(`智谱AI API 请求失败: ${zhipuResponse.status} ${errorText}`);
+      const errorText = await zhipuResponse.text();
+      throw new Error(`\u667A\u8C31AI API \u8BF7\u6C42\u5931\u8D25: ${zhipuResponse.status} ${errorText}`);
     }
-
-    // 创建流式响应
-    const {readable, writable} = new TransformStream();
+    const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const reader = zhipuResponse.body.getReader();
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
-
     (async () => {
-      let buffer = '';
+      let buffer = "";
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           buffer += decoder.decode(value, { stream: true });
           let boundary;
-          while ((boundary = buffer.indexOf('\n')) !== -1) {
+          while ((boundary = buffer.indexOf("\n")) !== -1) {
             const line = buffer.substring(0, boundary).trim();
             buffer = buffer.substring(boundary + 1);
-
-            if (line.startsWith('data: ')) {
+            if (line.startsWith("data: ")) {
               const jsonStr = line.substring(6);
-              if (jsonStr.trim() === '[DONE]') continue;
+              if (jsonStr.trim() === "[DONE]") continue;
               try {
                 const data = JSON.parse(jsonStr);
                 const content = data.choices[0]?.delta?.content || "";
@@ -105,84 +81,65 @@ async function handleAIAnalyze(request, env) {
           }
         }
       } catch (error) {
-        console.error('Error processing stream:', error);
+        console.error("Error processing stream:", error);
         await writer.abort(error);
       } finally {
         await writer.close();
       }
     })();
-
     return new Response(readable, {
       headers: { "Content-Type": "text/html; charset=utf-8" }
     });
-
   } catch (error) {
     return new Response(error.message, { status: 500 });
   }
 }
-
-/**
- * 处理 Ping 请求
- */
+__name(handleAIAnalyze, "handleAIAnalyze");
 function handlePing() {
   return new Response("pong", {
-    headers: { 
-        "content-type": "text/plain",
-        "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "access-control-allow-origin": "*"
-    },
+    headers: {
+      "content-type": "text/plain",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "access-control-allow-origin": "*"
+    }
   });
 }
-
-// =========================================
-//            页面渲染逻辑
-// =========================================
-
-/**
- * 渲染主 HTML 页面
- */
+__name(handlePing, "handlePing");
 function renderHTML(request) {
-    const cf = request.cf || {};
-    const rawIsp = cf.asOrganization || "";
-    const asn = cf.asn || 0;
-    const city = cf.city || "地球某处";
-    const region = cf.region || "";
-    const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
-    const colo = cf.colo || "UNK";
-    const nodeInfo = translateColo(colo);
-    
-    let coloHtml = nodeInfo.name;
-    if (nodeInfo.iso) {
-        coloHtml = `<img src="https://flagcdn.com/w40/${nodeInfo.iso}.png" class="flag-img" alt="${nodeInfo.iso}"> ${nodeInfo.name} <span style="opacity:0.6">(${colo})</span>`;
-    } else {
-        coloHtml = `${nodeInfo.name} <span style="opacity:0.6">(${colo})</span>`;
-    }
-
-    // 初始 RTT 计算与展示
-    let rtt = Number(cf.clientTcpRtt) || 0;
-    let rttDisplay = rtt + " ms";
-    let rttColor = "#10b981"; 
-    let isHttp3 = false;
-
-    if (rtt === 0) {
-        isHttp3 = true;
-        rttDisplay = `<span class="blink">测速中...</span>`; 
-    } else {
-        if (rtt > 350) rttColor = "#ef4444";      
-        else if (rtt > 150) rttColor = "#f59e0b"; 
-    }
-
-    const ispInfo = identifyISP(rawIsp, asn);
-    const locationStr = [city, region].filter(Boolean).join(", ");
-
-    // 返回完整的 HTML 字符串
-    return new Response(`
+  const cf = request.cf || {};
+  const rawIsp = cf.asOrganization || "";
+  const asn = cf.asn || 0;
+  const city = cf.city || "\u5730\u7403\u67D0\u5904";
+  const region = cf.region || "";
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  const colo = cf.colo || "UNK";
+  const nodeInfo = translateColo(colo);
+  let coloHtml = nodeInfo.name;
+  if (nodeInfo.iso) {
+    coloHtml = `<img src="https://flagcdn.com/w40/${nodeInfo.iso}.png" class="flag-img" alt="${nodeInfo.iso}"> ${nodeInfo.name} <span style="opacity:0.6">(${colo})</span>`;
+  } else {
+    coloHtml = `${nodeInfo.name} <span style="opacity:0.6">(${colo})</span>`;
+  }
+  let rtt = Number(cf.clientTcpRtt) || 0;
+  let rttDisplay = rtt + " ms";
+  let rttColor = "#10b981";
+  let isHttp3 = false;
+  if (rtt === 0) {
+    isHttp3 = true;
+    rttDisplay = `<span class="blink">\u6D4B\u901F\u4E2D...</span>`;
+  } else {
+    if (rtt > 350) rttColor = "#ef4444";
+    else if (rtt > 150) rttColor = "#f59e0b";
+  }
+  const ispInfo = identifyISP(rawIsp, asn);
+  const locationStr = [city, region].filter(Boolean).join(", ");
+  return new Response(`
     <!DOCTYPE html>
     <html lang="zh-CN">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>让我看看你的网！</title>
+        <title>\u8BA9\u6211\u770B\u770B\u4F60\u7684\u7F51\uFF01</title>
         <link rel="icon" href="https://imgbed.haokun.me/file/1768399588443_00007.png">
         <style>
             :root {
@@ -369,17 +326,17 @@ function renderHTML(request) {
         <div class="decoration circle-1"></div>
         <div class="decoration circle-2"></div>
         <div class="card">
-            <h1>当前流量来源</h1>
+            <h1>\u5F53\u524D\u6D41\u91CF\u6765\u6E90</h1>
             <div class="isp-tag">${ispInfo.name}</div>
             <div class="info-box">
-                <div class="info-row"><span class="label">当前连接使用的IP</span> <span class="value">${ip}</span></div>
-                <div class="info-row"><span class="label">IPv4 地址</span> <span class="value" id="ipv4-addr"><span class="blink">查询中...</span></span></div>
-                <div class="info-row"><span class="label">IPv6 地址</span> <span class="value" id="ipv6-addr"><span class="blink">查询中...</span></span></div>
-                <div class="info-row"><span class="label">CF归属地</span> <span class="value">${locationStr}</span></div>
-                <div class="info-row"><span class="label">API归属地 (IPv4)</span> <span class="value" id="ext-loc">查询中...</span></div>
+                <div class="info-row"><span class="label">\u5F53\u524D\u8FDE\u63A5\u4F7F\u7528\u7684IP</span> <span class="value">${ip}</span></div>
+                <div class="info-row"><span class="label">IPv4 \u5730\u5740</span> <span class="value" id="ipv4-addr"><span class="blink">\u67E5\u8BE2\u4E2D...</span></span></div>
+                <div class="info-row"><span class="label">IPv6 \u5730\u5740</span> <span class="value" id="ipv6-addr"><span class="blink">\u67E5\u8BE2\u4E2D...</span></span></div>
+                <div class="info-row"><span class="label">CF\u5F52\u5C5E\u5730</span> <span class="value">${locationStr}</span></div>
+                <div class="info-row"><span class="label">API\u5F52\u5C5E\u5730 (IPv4)</span> <span class="value" id="ext-loc">\u67E5\u8BE2\u4E2D...</span></div>
                 
                 <div class="info-row">
-                    <span class="label">连接延迟 (握手)</span> 
+                    <span class="label">\u8FDE\u63A5\u5EF6\u8FDF (\u63E1\u624B)</span> 
                     <span class="value" style="color:${rttColor}; font-weight:bold;" id="rtt-value">
                         <span class="status-dot" id="rtt-dot"></span>${rttDisplay}
                     </span>
@@ -388,7 +345,7 @@ function renderHTML(request) {
                 <div class="chart-wrapper">
                     <div class="switch-container">
                         <input type="radio" id="s-opt-1" name="switch" class="switch-input" checked onchange="changePingTarget(1)">
-                        <label for="s-opt-1" class="switch-option">本站</label>
+                        <label for="s-opt-1" class="switch-option">\u672C\u7AD9</label>
                         <input type="radio" id="s-opt-2" name="switch" class="switch-input" onchange="changePingTarget(2)">
                         <label for="s-opt-2" class="switch-option">Bilibili</label>
                         <input type="radio" id="s-opt-3" name="switch" class="switch-input" onchange="changePingTarget(3)">
@@ -401,25 +358,25 @@ function renderHTML(request) {
                     </div>
 
                     <div class="chart-header">
-                        <span id="ping-target-name">网络真连接连通性 (本站)</span>
+                        <span id="ping-target-name">\u7F51\u7EDC\u771F\u8FDE\u63A5\u8FDE\u901A\u6027 (\u672C\u7AD9)</span>
                         <span id="rt-ping-value" style="font-family:monospace; font-weight:bold;">-- ms</span>
                     </div>
                     
                     <div class="chart-container">
-                        <div class="expand-btn" onclick="openModal()" title="放大查看详细历史">
+                        <div class="expand-btn" onclick="openModal()" title="\u653E\u5927\u67E5\u770B\u8BE6\u7EC6\u5386\u53F2">
                             <svg viewBox="0 0 24 24"><path d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3zM9 21l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6zM21 15l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6z"/></svg>
                         </div>
                         <canvas id="ping-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="info-row" style="margin-top:8px"><span class="label">接入节点</span> <span class="value">${coloHtml}</span></div>
-                <div class="info-row"><span class="label">ASN编码</span> <span class="value">AS${asn}</span></div>
-                <div class="info-row"><span class="label">原始ISP</span> <span class="value" style="font-size:0.9em">${rawIsp}</span></div>
+                <div class="info-row" style="margin-top:8px"><span class="label">\u63A5\u5165\u8282\u70B9</span> <span class="value">${coloHtml}</span></div>
+                <div class="info-row"><span class="label">ASN\u7F16\u7801</span> <span class="value">AS${asn}</span></div>
+                <div class="info-row"><span class="label">\u539F\u59CBISP</span> <span class="value" style="font-size:0.9em">${rawIsp}</span></div>
             </div>
-            <a href="https://blog.haokun.me" class="btn">前往博客</a>
+            <a href="https://blog.haokun.me" class="btn">\u524D\u5F80\u535A\u5BA2</a>
             <div id="ai-result-container" class="ai-result">
-                <p class="loading">🤖 AI 正在分析您的网络...</p>
+                <p class="loading">\u{1F916} AI \u6B63\u5728\u5206\u6790\u60A8\u7684\u7F51\u7EDC...</p>
             </div>
             <img src="https://tool.lu/netcard/" class="signature-img" alt="IP Signature">
         </div>
@@ -427,13 +384,13 @@ function renderHTML(request) {
         <div class="modal-overlay" id="chart-modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <div class="modal-title" id="modal-title-text">详细延迟历史记录</div>
-                    <div class="modal-close" onclick="closeModal()">×</div>
+                    <div class="modal-title" id="modal-title-text">\u8BE6\u7EC6\u5EF6\u8FDF\u5386\u53F2\u8BB0\u5F55</div>
+                    <div class="modal-close" onclick="closeModal()">\xD7</div>
                 </div>
                 
                 <div class="switch-container">
                     <input type="radio" id="m-opt-1" name="modal-switch" class="switch-input" checked onchange="changePingTarget(1)">
-                    <label for="m-opt-1" class="switch-option">本站</label>
+                    <label for="m-opt-1" class="switch-option">\u672C\u7AD9</label>
                     <input type="radio" id="m-opt-2" name="modal-switch" class="switch-input" onchange="changePingTarget(2)">
                     <label for="m-opt-2" class="switch-option">Bilibili</label>
                     <input type="radio" id="m-opt-3" name="modal-switch" class="switch-input" onchange="changePingTarget(3)">
@@ -449,12 +406,12 @@ function renderHTML(request) {
                     <canvas id="large-ping-chart"></canvas>
                 </div>
                 <div class="modal-stats">
-                    <div class="stat-item">当前: <b id="stat-curr">--</b> ms</div>
-                    <div class="stat-item">平均: <b id="stat-avg">--</b> ms</div>
-                    <div class="stat-item">最大: <b id="stat-max">--</b> ms</div>
-                    <div class="stat-item">最小: <b id="stat-min">--</b> ms</div>
-                    <div class="stat-item">抖动: <b id="stat-jitter">--</b> ms</div>
-                    <div class="stat-item" style="margin-left:auto; font-size:0.8em; opacity:0.7">显示最近 200 次记录</div>
+                    <div class="stat-item">\u5F53\u524D: <b id="stat-curr">--</b> ms</div>
+                    <div class="stat-item">\u5E73\u5747: <b id="stat-avg">--</b> ms</div>
+                    <div class="stat-item">\u6700\u5927: <b id="stat-max">--</b> ms</div>
+                    <div class="stat-item">\u6700\u5C0F: <b id="stat-min">--</b> ms</div>
+                    <div class="stat-item">\u6296\u52A8: <b id="stat-jitter">--</b> ms</div>
+                    <div class="stat-item" style="margin-left:auto; font-size:0.8em; opacity:0.7">\u663E\u793A\u6700\u8FD1 200 \u6B21\u8BB0\u5F55</div>
                 </div>
             </div>
         </div>
@@ -465,7 +422,7 @@ function renderHTML(request) {
                 fetch('https://ipv6.icanhazip.com').then(res => res.text()).then(ipv6 => {
                     document.getElementById('ipv6-addr').innerText = ipv6.trim();
                 }).catch(() => {
-                    document.getElementById('ipv6-addr').innerText = '不可用';
+                    document.getElementById('ipv6-addr').innerText = '\u4E0D\u53EF\u7528';
                 });
 
                 fetch('https://ipv4.icanhazip.com').then(res => res.text()).then(ipv4 => {
@@ -474,7 +431,7 @@ function renderHTML(request) {
                     return cleanIpv4;
                 }).then(ipv4 => {
                     if (!ipv4) {
-                        document.getElementById('ext-loc').innerText = '查询失败';
+                        document.getElementById('ext-loc').innerText = '\u67E5\u8BE2\u5931\u8D25';
                         startAiAnalysis();
                         return;
                     }
@@ -482,12 +439,12 @@ function renderHTML(request) {
                         .then(r => r.json())
                         .then(d => {
                             const loc = [d.city, d.region, d.country_name].filter(Boolean).join(', ');
-                            document.getElementById('ext-loc').innerText = loc || '未知';
+                            document.getElementById('ext-loc').innerText = loc || '\u672A\u77E5';
                         })
-                        .catch(() => { document.getElementById('ext-loc').innerText = '查询超时'; })
+                        .catch(() => { document.getElementById('ext-loc').innerText = '\u67E5\u8BE2\u8D85\u65F6'; })
                         .finally(() => { startAiAnalysis(); });
                 }).catch(() => {
-                    document.getElementById('ipv4-addr').innerText = '不可用';
+                    document.getElementById('ipv4-addr').innerText = '\u4E0D\u53EF\u7528';
                     startAiAnalysis();
                 });
             }
@@ -544,7 +501,7 @@ function renderHTML(request) {
             let isModalOpen = false;
             
             const pingTargets = {
-                1: { name: '本站', url: window.location.pathname + '?act=ping' },
+                1: { name: '\u672C\u7AD9', url: window.location.pathname + '?act=ping' },
                 2: { name: 'Bilibili', url: 'https://www.bilibili.com/favicon.ico' },
                 3: { name: 'Microsoft', url: 'https://www.microsoft.com/favicon.ico' },
                 4: { name: 'Visa', url: 'https://www.visa.cn/favicon.ico' },
@@ -555,8 +512,8 @@ function renderHTML(request) {
             window.changePingTarget = function(id) {
                 currentTargetId = id;
                 const name = pingTargets[id].name;
-                targetNameElem.innerText = '网络真连接连通性 (' + name + ')';
-                modalTitle.innerText = name + ' - 详细延迟历史';
+                targetNameElem.innerText = '\u7F51\u7EDC\u771F\u8FDE\u63A5\u8FDE\u901A\u6027 (' + name + ')';
+                modalTitle.innerText = name + ' - \u8BE6\u7EC6\u5EF6\u8FDF\u5386\u53F2';
                 document.getElementById('s-opt-' + id).checked = true;
                 document.getElementById('m-opt-' + id).checked = true;
                 pingData.fill(0);
@@ -697,7 +654,7 @@ function renderHTML(request) {
 
                 pingData.shift();
                 pingData.push(dur);
-                rtValueElem.innerText = (dur > 0 ? dur : '超时') + ' ms';
+                rtValueElem.innerText = (dur > 0 ? dur : '\u8D85\u65F6') + ' ms';
                 if (isModalOpen) updateStats(dur);
                 requestAnimationFrame(drawCharts);
             }
@@ -740,12 +697,12 @@ function renderHTML(request) {
                     
                     if (!response.ok) {
                         const errText = await response.text();
-                        // 尝试解析 JSON 错误
+                        // \u5C1D\u8BD5\u89E3\u6790 JSON \u9519\u8BEF
                         try {
                            const jsonErr = JSON.parse(errText);
                            throw new Error(jsonErr.error || errText);
                         } catch(e) {
-                           throw new Error(errText || \`服务器错误: \${response.status}\`);
+                           throw new Error(errText || \`\u670D\u52A1\u5668\u9519\u8BEF: \${response.status}\`);
                         }
                     }
                     
@@ -755,9 +712,10 @@ function renderHTML(request) {
                         const { done, value } = await reader.read();
                         if (done) break;
                         const chunk = decoder.decode(value, { stream: true });
-                        const formattedChunk = chunk.replace(/\n/g, '<br>');
+                        const formattedChunk = chunk.replace(/
+/g, '<br>');
 
-                        if (isFirstChunk && /[\u4e00-\u9fa5]/.test(chunk)) {
+                        if (isFirstChunk && /[\u4E00-\u9FA5]/.test(chunk)) {
                             p.classList.remove('loading');
                             p.innerHTML = formattedChunk;
                             isFirstChunk = false;
@@ -767,104 +725,267 @@ function renderHTML(request) {
                     }
                 } catch (error) {
                     p.classList.remove('loading');
-                    p.innerHTML = '<span class="error">分析失败：' + error.message + '</span>';
+                    p.innerHTML = '<span class="error">\u5206\u6790\u5931\u8D25\uFF1A' + error.message + '</span>';
                 }
             }
-        </script>
+        <\/script>
     </body>
     </html>
     `, {
-      headers: { "content-type": "text/html;charset=UTF-8" },
-    });
+    headers: { "content-type": "text/html;charset=UTF-8" }
+  });
 }
-
-// =========================================
-//            辅助工具函数
-// =========================================
-
+__name(renderHTML, "renderHTML");
 function identifyISP(rawIsp, asn) {
-    const isp = rawIsp.toLowerCase();
-    
-    // 默认样式
-    let result = { name: rawIsp || "未知网络", color: "#555555", bg: "rgba(85, 85, 85, 0.1)" };
-
-    // 1. 中国大陆
-    if (isp.includes("chinanet") || isp.includes("telecom")) 
-        return { name: "中国电信", color: "#0066CC", bg: "rgba(0, 102, 204, 0.1)" };
-    if (isp.includes("unicom")) 
-        return { name: "中国联通", color: "#E60012", bg: "rgba(230, 0, 18, 0.1)" };
-    if (isp.includes("mobile") || isp.includes("cmcc") || isp.includes("tietong")) 
-        return { name: "中国移动", color: "#0085D0", bg: "rgba(0, 133, 208, 0.1)" };
-    if (isp.includes("broadnet") || isp.includes("cable") || isp.includes("gehua")) 
-        return { name: "中国广电", color: "#7CB342", bg: "rgba(124, 179, 66, 0.15)" };
-    if (isp.includes("cernet")) 
-        return { name: "中国教育网", color: "#00A0E9", bg: "rgba(0, 160, 233, 0.1)" };
-    if (isp.includes("dr.peng") || isp.includes("great wall")) 
-        return { name: "长城/鹏博士", color: "#E85928", bg: "rgba(232, 89, 40, 0.1)" };
-
-    // 2. 港澳台
-    if (isp.includes("hkt") || isp.includes("pccw")) 
-        return { name: "HKT (香港电讯)", color: "#00539F", bg: "rgba(0, 83, 159, 0.1)" };
-    if (isp.includes("hkbn")) 
-        return { name: "HKBN (香港宽频)", color: "#743C8F", bg: "rgba(116, 60, 143, 0.1)" };
-    if (isp.includes("hgc")) 
-        return { name: "HGC", color: "#E3007F", bg: "rgba(227, 0, 127, 0.1)" };
-    if (isp.includes("cmhk")) 
-        return { name: "CMHK", color: "#0085D0", bg: "rgba(0, 133, 208, 0.1)" };
-    if (isp.includes("ctm")) 
-        return { name: "CTM (澳门电讯)", color: "#00A651", bg: "rgba(0, 166, 81, 0.1)" };
-    if (isp.includes("chunghwa") || isp.includes("hinet")) 
-        return { name: "中华电信 (HiNet)", color: "#2E57A6", bg: "rgba(46, 87, 166, 0.1)" };
-
-    // 3. 云厂商
-    if (isp.includes("alibaba") || isp.includes("aliyun")) 
-        return { name: "阿里云", color: "#FF6A00", bg: "rgba(255, 106, 0, 0.1)" };
-    if (isp.includes("tencent")) 
-        return { name: "腾讯云", color: "#0052D9", bg: "rgba(0, 82, 217, 0.1)" };
-    if (isp.includes("huawei")) 
-        return { name: "华为云", color: "#C7000B", bg: "rgba(199, 0, 11, 0.1)" };
-    if (isp.includes("google")) 
-        return { name: "Google Cloud", color: "#4285F4", bg: "rgba(66, 133, 244, 0.1)" };
-    if (isp.includes("amazon") || isp.includes("aws")) 
-        return { name: "AWS", color: "#FF9900", bg: "rgba(255, 153, 0, 0.1)" };
-    if (isp.includes("microsoft") || isp.includes("azure")) 
-        return { name: "Microsoft Azure", color: "#0078D4", bg: "rgba(0, 120, 212, 0.1)" };
-    if (isp.includes("oracle")) 
-        return { name: "Oracle Cloud", color: "#C74634", bg: "rgba(199, 70, 52, 0.1)" };
-    if (isp.includes("digitalocean")) 
-        return { name: "DigitalOcean", color: "#0080FF", bg: "rgba(0, 128, 255, 0.1)" };
-    if (isp.includes("vultr")) 
-        return { name: "Vultr", color: "#0057E7", bg: "rgba(0, 87, 231, 0.1)" };
-    if (isp.includes("linode")) 
-        return { name: "Linode", color: "#02B159", bg: "rgba(2, 177, 89, 0.1)" };
-    if (isp.includes("cloudflare")) 
-        return { name: "Cloudflare WARP", color: "#F38020", bg: "rgba(243, 128, 32, 0.1)" };
-
-    return result;
+  const isp = rawIsp.toLowerCase();
+  let result = { name: rawIsp || "\u672A\u77E5\u7F51\u7EDC", color: "#555555", bg: "rgba(85, 85, 85, 0.1)" };
+  if (isp.includes("chinanet") || isp.includes("telecom"))
+    return { name: "\u4E2D\u56FD\u7535\u4FE1", color: "#0066CC", bg: "rgba(0, 102, 204, 0.1)" };
+  if (isp.includes("unicom"))
+    return { name: "\u4E2D\u56FD\u8054\u901A", color: "#E60012", bg: "rgba(230, 0, 18, 0.1)" };
+  if (isp.includes("mobile") || isp.includes("cmcc") || isp.includes("tietong"))
+    return { name: "\u4E2D\u56FD\u79FB\u52A8", color: "#0085D0", bg: "rgba(0, 133, 208, 0.1)" };
+  if (isp.includes("broadnet") || isp.includes("cable") || isp.includes("gehua"))
+    return { name: "\u4E2D\u56FD\u5E7F\u7535", color: "#7CB342", bg: "rgba(124, 179, 66, 0.15)" };
+  if (isp.includes("cernet"))
+    return { name: "\u4E2D\u56FD\u6559\u80B2\u7F51", color: "#00A0E9", bg: "rgba(0, 160, 233, 0.1)" };
+  if (isp.includes("dr.peng") || isp.includes("great wall"))
+    return { name: "\u957F\u57CE/\u9E4F\u535A\u58EB", color: "#E85928", bg: "rgba(232, 89, 40, 0.1)" };
+  if (isp.includes("hkt") || isp.includes("pccw"))
+    return { name: "HKT (\u9999\u6E2F\u7535\u8BAF)", color: "#00539F", bg: "rgba(0, 83, 159, 0.1)" };
+  if (isp.includes("hkbn"))
+    return { name: "HKBN (\u9999\u6E2F\u5BBD\u9891)", color: "#743C8F", bg: "rgba(116, 60, 143, 0.1)" };
+  if (isp.includes("hgc"))
+    return { name: "HGC", color: "#E3007F", bg: "rgba(227, 0, 127, 0.1)" };
+  if (isp.includes("cmhk"))
+    return { name: "CMHK", color: "#0085D0", bg: "rgba(0, 133, 208, 0.1)" };
+  if (isp.includes("ctm"))
+    return { name: "CTM (\u6FB3\u95E8\u7535\u8BAF)", color: "#00A651", bg: "rgba(0, 166, 81, 0.1)" };
+  if (isp.includes("chunghwa") || isp.includes("hinet"))
+    return { name: "\u4E2D\u534E\u7535\u4FE1 (HiNet)", color: "#2E57A6", bg: "rgba(46, 87, 166, 0.1)" };
+  if (isp.includes("alibaba") || isp.includes("aliyun"))
+    return { name: "\u963F\u91CC\u4E91", color: "#FF6A00", bg: "rgba(255, 106, 0, 0.1)" };
+  if (isp.includes("tencent"))
+    return { name: "\u817E\u8BAF\u4E91", color: "#0052D9", bg: "rgba(0, 82, 217, 0.1)" };
+  if (isp.includes("huawei"))
+    return { name: "\u534E\u4E3A\u4E91", color: "#C7000B", bg: "rgba(199, 0, 11, 0.1)" };
+  if (isp.includes("google"))
+    return { name: "Google Cloud", color: "#4285F4", bg: "rgba(66, 133, 244, 0.1)" };
+  if (isp.includes("amazon") || isp.includes("aws"))
+    return { name: "AWS", color: "#FF9900", bg: "rgba(255, 153, 0, 0.1)" };
+  if (isp.includes("microsoft") || isp.includes("azure"))
+    return { name: "Microsoft Azure", color: "#0078D4", bg: "rgba(0, 120, 212, 0.1)" };
+  if (isp.includes("oracle"))
+    return { name: "Oracle Cloud", color: "#C74634", bg: "rgba(199, 70, 52, 0.1)" };
+  if (isp.includes("digitalocean"))
+    return { name: "DigitalOcean", color: "#0080FF", bg: "rgba(0, 128, 255, 0.1)" };
+  if (isp.includes("vultr"))
+    return { name: "Vultr", color: "#0057E7", bg: "rgba(0, 87, 231, 0.1)" };
+  if (isp.includes("linode"))
+    return { name: "Linode", color: "#02B159", bg: "rgba(2, 177, 89, 0.1)" };
+  if (isp.includes("cloudflare"))
+    return { name: "Cloudflare WARP", color: "#F38020", bg: "rgba(243, 128, 32, 0.1)" };
+  return result;
 }
-
+__name(identifyISP, "identifyISP");
 function translateColo(coloCode) {
-    const code = coloCode.toUpperCase();
-    const map = {
-        "HKG": { name: "香港", iso: "hk" },
-        "TPE": { name: "台北", iso: "tw" },
-        "NRT": { name: "东京", iso: "jp" },
-        "KIX": { name: "大阪", iso: "jp" },
-        "ICN": { name: "首尔", iso: "kr" },
-        "SIN": { name: "新加坡", iso: "sg" },
-        "KUL": { name: "吉隆坡", iso: "my" },
-        "BKK": { name: "曼谷", iso: "th" },
-        "SGN": { name: "胡志明市", iso: "vn" },
-        "MNL": { name: "马尼拉", iso: "ph" },
-        "LAX": { name: "洛杉矶", iso: "us" },
-        "SJC": { name: "圣何塞", iso: "us" },
-        "SFO": { name: "旧金山", iso: "us" },
-        "SEA": { name: "西雅图", iso: "us" },
-        "JFK": { name: "纽约", iso: "us" },
-        "LHR": { name: "伦敦", iso: "gb" },
-        "FRA": { name: "法兰克福", iso: "de" },
-        "AMS": { name: "阿姆斯特丹", iso: "nl" },
-        "SYD": { name: "悉尼", iso: "au" },
-    };
-    return map[code] || { name: code, iso: null };
+  const code = coloCode.toUpperCase();
+  const map = {
+    "HKG": { name: "\u9999\u6E2F", iso: "hk" },
+    "TPE": { name: "\u53F0\u5317", iso: "tw" },
+    "NRT": { name: "\u4E1C\u4EAC", iso: "jp" },
+    "KIX": { name: "\u5927\u962A", iso: "jp" },
+    "ICN": { name: "\u9996\u5C14", iso: "kr" },
+    "SIN": { name: "\u65B0\u52A0\u5761", iso: "sg" },
+    "KUL": { name: "\u5409\u9686\u5761", iso: "my" },
+    "BKK": { name: "\u66FC\u8C37", iso: "th" },
+    "SGN": { name: "\u80E1\u5FD7\u660E\u5E02", iso: "vn" },
+    "MNL": { name: "\u9A6C\u5C3C\u62C9", iso: "ph" },
+    "LAX": { name: "\u6D1B\u6749\u77F6", iso: "us" },
+    "SJC": { name: "\u5723\u4F55\u585E", iso: "us" },
+    "SFO": { name: "\u65E7\u91D1\u5C71", iso: "us" },
+    "SEA": { name: "\u897F\u96C5\u56FE", iso: "us" },
+    "JFK": { name: "\u7EBD\u7EA6", iso: "us" },
+    "LHR": { name: "\u4F26\u6566", iso: "gb" },
+    "FRA": { name: "\u6CD5\u5170\u514B\u798F", iso: "de" },
+    "AMS": { name: "\u963F\u59C6\u65AF\u7279\u4E39", iso: "nl" },
+    "SYD": { name: "\u6089\u5C3C", iso: "au" }
+  };
+  return map[code] || { name: code, iso: null };
 }
+__name(translateColo, "translateColo");
+
+// C:/Users/chaog/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
+var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+  try {
+    return await middlewareCtx.next(request, env);
+  } finally {
+    try {
+      if (request.body !== null && !request.bodyUsed) {
+        const reader = request.body.getReader();
+        while (!(await reader.read()).done) {
+        }
+      }
+    } catch (e) {
+      console.error("Failed to drain the unused request body.", e);
+    }
+  }
+}, "drainBody");
+var middleware_ensure_req_body_drained_default = drainBody;
+
+// C:/Users/chaog/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
+function reduceError(e) {
+  return {
+    name: e?.name,
+    message: e?.message ?? String(e),
+    stack: e?.stack,
+    cause: e?.cause === void 0 ? void 0 : reduceError(e.cause)
+  };
+}
+__name(reduceError, "reduceError");
+var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+  try {
+    return await middlewareCtx.next(request, env);
+  } catch (e) {
+    const error = reduceError(e);
+    return Response.json(error, {
+      status: 500,
+      headers: { "MF-Experimental-Error-Stack": "true" }
+    });
+  }
+}, "jsonError");
+var middleware_miniflare3_json_error_default = jsonError;
+
+// .wrangler/tmp/bundle-qD7xL2/middleware-insertion-facade.js
+var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
+  middleware_ensure_req_body_drained_default,
+  middleware_miniflare3_json_error_default
+];
+var middleware_insertion_facade_default = src_default;
+
+// C:/Users/chaog/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/common.ts
+var __facade_middleware__ = [];
+function __facade_register__(...args) {
+  __facade_middleware__.push(...args.flat());
+}
+__name(__facade_register__, "__facade_register__");
+function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
+  const [head, ...tail] = middlewareChain;
+  const middlewareCtx = {
+    dispatch,
+    next(newRequest, newEnv) {
+      return __facade_invokeChain__(newRequest, newEnv, ctx, dispatch, tail);
+    }
+  };
+  return head(request, env, ctx, middlewareCtx);
+}
+__name(__facade_invokeChain__, "__facade_invokeChain__");
+function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
+  return __facade_invokeChain__(request, env, ctx, dispatch, [
+    ...__facade_middleware__,
+    finalMiddleware
+  ]);
+}
+__name(__facade_invoke__, "__facade_invoke__");
+
+// .wrangler/tmp/bundle-qD7xL2/middleware-loader.entry.ts
+var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
+  constructor(scheduledTime, cron, noRetry) {
+    this.scheduledTime = scheduledTime;
+    this.cron = cron;
+    this.#noRetry = noRetry;
+  }
+  static {
+    __name(this, "__Facade_ScheduledController__");
+  }
+  #noRetry;
+  noRetry() {
+    if (!(this instanceof ___Facade_ScheduledController__)) {
+      throw new TypeError("Illegal invocation");
+    }
+    this.#noRetry();
+  }
+};
+function wrapExportedHandler(worker) {
+  if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
+    return worker;
+  }
+  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
+    __facade_register__(middleware);
+  }
+  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
+    if (worker.fetch === void 0) {
+      throw new Error("Handler does not export a fetch() function.");
+    }
+    return worker.fetch(request, env, ctx);
+  }, "fetchDispatcher");
+  return {
+    ...worker,
+    fetch(request, env, ctx) {
+      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
+        if (type === "scheduled" && worker.scheduled !== void 0) {
+          const controller = new __Facade_ScheduledController__(
+            Date.now(),
+            init.cron ?? "",
+            () => {
+            }
+          );
+          return worker.scheduled(controller, env, ctx);
+        }
+      }, "dispatcher");
+      return __facade_invoke__(request, env, ctx, dispatcher, fetchDispatcher);
+    }
+  };
+}
+__name(wrapExportedHandler, "wrapExportedHandler");
+function wrapWorkerEntrypoint(klass) {
+  if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
+    return klass;
+  }
+  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
+    __facade_register__(middleware);
+  }
+  return class extends klass {
+    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
+      this.env = env;
+      this.ctx = ctx;
+      if (super.fetch === void 0) {
+        throw new Error("Entrypoint class does not define a fetch() function.");
+      }
+      return super.fetch(request);
+    }, "#fetchDispatcher");
+    #dispatcher = /* @__PURE__ */ __name((type, init) => {
+      if (type === "scheduled" && super.scheduled !== void 0) {
+        const controller = new __Facade_ScheduledController__(
+          Date.now(),
+          init.cron ?? "",
+          () => {
+          }
+        );
+        return super.scheduled(controller);
+      }
+    }, "#dispatcher");
+    fetch(request) {
+      return __facade_invoke__(
+        request,
+        this.env,
+        this.ctx,
+        this.#dispatcher,
+        this.#fetchDispatcher
+      );
+    }
+  };
+}
+__name(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
+var WRAPPED_ENTRY;
+if (typeof middleware_insertion_facade_default === "object") {
+  WRAPPED_ENTRY = wrapExportedHandler(middleware_insertion_facade_default);
+} else if (typeof middleware_insertion_facade_default === "function") {
+  WRAPPED_ENTRY = wrapWorkerEntrypoint(middleware_insertion_facade_default);
+}
+var middleware_loader_entry_default = WRAPPED_ENTRY;
+export {
+  __INTERNAL_WRANGLER_MIDDLEWARE__,
+  middleware_loader_entry_default as default
+};
+//# sourceMappingURL=index.js.map
