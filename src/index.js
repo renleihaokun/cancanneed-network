@@ -43,11 +43,19 @@ function handleGetIPInfo(request) {
     const asn = cf.asn || 0;
     const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
     const colo = cf.colo || "UNK";
+    const country = cf.country || "";
+    const city = cf.city || "";
+    const region = cf.region || "";
     const nodeInfo = translateColo(colo);
     const ispInfo = identifyISP(rawIsp, asn);
 
     const data = {
         ip: ip,
+        location: {
+            country: country,
+            region: region,
+            city: city
+        },
         node: {
             code: colo,
             name: nodeInfo.name,
@@ -57,7 +65,8 @@ function handleGetIPInfo(request) {
         isp: {
             name: ispInfo.name,
             raw: rawIsp
-        }
+        },
+        rtt: Number(cf.clientTcpRtt) || 0
     };
 
     return new Response(JSON.stringify(data, null, 2), {
