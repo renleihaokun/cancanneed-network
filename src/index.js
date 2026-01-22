@@ -49,6 +49,15 @@ function handleGetIPInfo(request) {
     const nodeInfo = translateColo(colo);
     const ispInfo = identifyISP(rawIsp, asn);
 
+    let rtt = Number(cf.clientTcpRtt) || 0;
+    if (rtt === 0) {
+        const url = new URL(request.url);
+        const measuredRtt = Number(url.searchParams.get('rtt'));
+        if (!isNaN(measuredRtt)) {
+            rtt = measuredRtt;
+        }
+    }
+
     const data = {
         ip: ip,
         location: {
@@ -66,7 +75,7 @@ function handleGetIPInfo(request) {
             name: ispInfo.name,
             raw: rawIsp
         },
-        rtt: Number(cf.clientTcpRtt) || 0
+        rtt: rtt
     };
 
     return new Response(JSON.stringify(data, null, 2), {
