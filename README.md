@@ -57,4 +57,4 @@ curl "https://ip.haokun.me/?act=get_ip_info"
 | `asn` | Number | 自治系统号 (ASN) |
 | `isp.name` | String | 识别后的 ISP 中文名称 |
 | `isp.raw` | String | 原始 ISP 组织名称 |
-| `rtt` | Number | 客户端到 Cloudflare 边缘节点的连接往返延迟 (ms) |
+| `rtt` | Number | 客户端到 Cloudflare 边缘节点的连接往返延迟 (ms)(http/3会返回0且修不了一点) |
