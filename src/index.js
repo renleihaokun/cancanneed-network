@@ -50,12 +50,11 @@ function handleGetIPInfo(request) {
     const ispInfo = identifyISP(rawIsp, asn);
 
     let rtt = Number(cf.clientTcpRtt) || 0;
-    if (rtt === 0) {
-        const url = new URL(request.url);
-        const measuredRtt = Number(url.searchParams.get('rtt'));
-        if (!isNaN(measuredRtt)) {
-            rtt = measuredRtt;
-        }
+    const url = new URL(request.url);
+    const measuredRtt = Number(url.searchParams.get('rtt'));
+    
+    if (url.searchParams.has('rtt') && !isNaN(measuredRtt)) {
+        rtt = measuredRtt;
     }
 
     const data = {
