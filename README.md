@@ -2,7 +2,7 @@
 看看你的  
 网！
 
-### 如需使用 AI 功能，请先配置ZHIPU_API_KEY="你的密钥"
+### 如需使用 AI 功能，请先在cloudflare workers secrets中配置ZHIPU_API_KEY="你的密钥"
 
 
 ### API 文档
