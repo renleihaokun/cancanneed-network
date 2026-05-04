@@ -502,7 +502,7 @@ function renderHTML(request) {
                 <div class="info-row"><span class="label">ASN编码</span> <span class="value">AS${asn}</span></div>
                 <div class="info-row"><span class="label">原始ISP</span> <span class="value" style="font-size:0.9em">${rawIsp}</span></div>
             </div>
-            <a href="https://blog.haokun.me" class="btn">前往博客</a>
+            <a href="https://   haokun.me" class="btn">前往博客</a>
             <div id="ai-result-container" class="ai-result">
                 <p class="loading">🤖 AI 正在分析您的网络...</p>
             </div>
@@ -636,7 +636,7 @@ function renderHTML(request) {
             
             const pingTargets = {
                 1: { name: '本站', url: window.location.pathname + '?act=ping', needCors: false },
-                2: { name: 'Blog', url: 'https://blog.haokun.me/assets/home/home.webp', needCors: true },
+                2: { name: 'Blog', url: 'https://haokun.me/', needCors: true },
                 3: { name: 'Bilibili', url: 'https://www.bilibili.com/favicon.ico', needCors: true },
                 4: { name: 'Microsoft', url: 'https://www.microsoft.com/favicon.ico', needCors: true },
                 5: { name: 'Visa', url: 'https://www.visa.cn/favicon.ico', needCors: true },
@@ -777,7 +777,10 @@ function renderHTML(request) {
                 let dur = 0;
                 try {
                     const fetchOpts = { cache: 'no-store' };
-                    if (target.needCors) fetchOpts.mode = 'no-cors';
+                    if (target.needCors) {
+                        fetchOpts.mode = 'no-cors';
+                        fetchOpts.method = 'HEAD';
+                    }
                     await fetch(url, fetchOpts);
                     dur = Math.round(performance.now() - start);
                     

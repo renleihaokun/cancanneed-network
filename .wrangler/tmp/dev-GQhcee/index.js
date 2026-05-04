@@ -452,7 +452,7 @@ function renderHTML(request) {
                 <div class="info-row"><span class="label">ASN\u7F16\u7801</span> <span class="value">AS${asn}</span></div>
                 <div class="info-row"><span class="label">\u539F\u59CBISP</span> <span class="value" style="font-size:0.9em">${rawIsp}</span></div>
             </div>
-            <a href="https://blog.haokun.me" class="btn">\u524D\u5F80\u535A\u5BA2</a>
+            <a href="https://   haokun.me" class="btn">\u524D\u5F80\u535A\u5BA2</a>
             <div id="ai-result-container" class="ai-result">
                 <p class="loading">\u{1F916} AI \u6B63\u5728\u5206\u6790\u60A8\u7684\u7F51\u7EDC...</p>
             </div>
@@ -586,7 +586,7 @@ function renderHTML(request) {
             
             const pingTargets = {
                 1: { name: '\u672C\u7AD9', url: window.location.pathname + '?act=ping', needCors: false },
-                2: { name: 'Blog', url: 'https://blog.haokun.me/assets/home/home.webp', needCors: true },
+                2: { name: 'Blog', url: 'https://haokun.me/', needCors: true },
                 3: { name: 'Bilibili', url: 'https://www.bilibili.com/favicon.ico', needCors: true },
                 4: { name: 'Microsoft', url: 'https://www.microsoft.com/favicon.ico', needCors: true },
                 5: { name: 'Visa', url: 'https://www.visa.cn/favicon.ico', needCors: true },
@@ -727,7 +727,10 @@ function renderHTML(request) {
                 let dur = 0;
                 try {
                     const fetchOpts = { cache: 'no-store' };
-                    if (target.needCors) fetchOpts.mode = 'no-cors';
+                    if (target.needCors) {
+                        fetchOpts.mode = 'no-cors';
+                        fetchOpts.method = 'HEAD';
+                    }
                     await fetch(url, fetchOpts);
                     dur = Math.round(performance.now() - start);
                     
