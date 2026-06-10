@@ -84,45 +84,43 @@ export async function analyze(c: Context<{ Bindings: Env }>) {
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
 
-    // H1 修复：使用 ctx.waitUntil() 确保流式响应完成
-    c.executionCtx.waitUntil(
-      (async () => {
-        let buffer = '';
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+    // 直接处理流式数据，不使用 waitUntil
+    (async () => {
+      let buffer = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
-            let boundary;
-            while ((boundary = buffer.indexOf('\n')) !== -1) {
-              const line = buffer.substring(0, boundary).trim();
-              buffer = buffer.substring(boundary + 1);
+          buffer += decoder.decode(value, { stream: true });
+          let boundary;
+          while ((boundary = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.substring(0, boundary).trim();
+            buffer = buffer.substring(boundary + 1);
 
-              if (line.startsWith('data: ')) {
-                const jsonStr = line.substring(6);
-                if (jsonStr.trim() === '[DONE]') continue;
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.substring(6);
+              if (jsonStr.trim() === '[DONE]') continue;
 
-                try {
-                  const data = JSON.parse(jsonStr);
-                  const content = data.choices[0]?.delta?.content || '';
-                  if (content) {
-                    await writer.write(encoder.encode(content));
-                  }
-                } catch {
-                  // 忽略解析错误，继续处理下一个数据块
+              try {
+                const data = JSON.parse(jsonStr);
+                const content = data.choices[0]?.delta?.content || '';
+                if (content) {
+                  await writer.write(encoder.encode(content));
                 }
+              } catch {
+                // 忽略解析错误，继续处理下一个数据块
               }
             }
           }
-        } catch (error) {
-          console.error('[AI] Stream processing error:', error);
-          await writer.abort(error);
-        } finally {
-          await writer.close();
         }
-      })()
-    );
+      } catch (error) {
+        console.error('[AI] Stream processing error:', error);
+        await writer.abort(error);
+      } finally {
+        await writer.close();
+      }
+    })();
 
     return new Response(readable, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
