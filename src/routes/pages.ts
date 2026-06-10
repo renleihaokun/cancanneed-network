@@ -8,6 +8,7 @@ import type { Env } from '../../types/env';
 import type { RequestWithCf, ISPInfo, ColoInfo } from '../../types/env';
 import { identifyISP } from '../services/isp';
 import { translateColo } from '../services/colo';
+import { analyze } from '../handlers/ai';
 
 const pages = new Hono<{ Bindings: Env }>();
 
@@ -1023,13 +1024,8 @@ function generateHTML(data: TemplateData): string {
 pages.post('/', async (c) => {
   const action = c.req.query('act');
   if (action === 'analyze') {
-    // 保留所有查询参数，转发到 API 路由
-    const url = new URL(c.req.url);
-    url.pathname = '/api/legacy';
-    // 对于 POST 请求，不能简单重定向，需要转发请求体
     // 直接调用 AI 处理器
-    const { analyze } = await import('../handlers/ai');
-    return analyze(c);
+    return analyze(c as any);
   }
 
   return c.json({ error: 'Unknown action' }, 400);
