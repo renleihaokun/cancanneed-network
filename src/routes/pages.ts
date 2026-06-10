@@ -30,11 +30,15 @@ function escapeHtml(str: string): string {
  * 渲染完整的 HTML 页面
  * H3 修复：在此处处理旧路由兼容逻辑
  */
+// 处理 GET 请求的旧路由兼容
 pages.get('/', (c) => {
   // H3 修复：处理旧路由兼容（/?act=xxx）
   const action = c.req.query('act');
   if (action) {
-    return c.redirect(`/api/legacy?act=${action}`, 302);
+    // 保留所有查询参数，不仅仅是 act
+    const url = new URL(c.req.url);
+    url.pathname = '/api/legacy';
+    return c.redirect(url.toString(), 302);
   }
 
   const request = c.req.raw as RequestWithCf;
@@ -1014,5 +1018,21 @@ function generateHTML(data: TemplateData): string {
 </html>
   `;
 }
+
+// 处理 POST 请求的旧路由兼容（AI 分析）
+pages.post('/', async (c) => {
+  const action = c.req.query('act');
+  if (action === 'analyze') {
+    // 保留所有查询参数，转发到 API 路由
+    const url = new URL(c.req.url);
+    url.pathname = '/api/legacy';
+    // 对于 POST 请求，不能简单重定向，需要转发请求体
+    // 直接调用 AI 处理器
+    const { analyze } = await import('../handlers/ai');
+    return analyze(c);
+  }
+
+  return c.json({ error: 'Unknown action' }, 400);
+});
 
 export default pages;
