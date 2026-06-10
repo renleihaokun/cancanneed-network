@@ -1,0 +1,24 @@
+{
+  "name": "cancanneed-network",
+  "version": "1.0.0",
+  "private": true,
+  "description": "基于 Cloudflare Workers 的网络信息查询网站",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.14",
+    "@cloudflare/workers-types": "^4.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^4.1.8",
+    "wrangler": "^3.0.0"
+  }
+}
