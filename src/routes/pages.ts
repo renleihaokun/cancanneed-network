@@ -637,9 +637,11 @@ function generateHTML(data: TemplateData): string {
         }
 
         if (isHttp3) {
-            const pingUrl = window.location.pathname + '?act=ping&t=' + Date.now();
-            fetch(pingUrl).then(() => {
-                const measureUrl = window.location.pathname + '?act=ping&t=' + (Date.now() + 1);
+            // M1 修复：使用新路由 /api/ping，避免重定向影响测量准确性
+            const pingUrl = '/api/ping?t=' + Date.now();
+            // M2 修复：添加错误处理，即使首次请求失败也继续测量
+            fetch(pingUrl).catch(() => {}).finally(() => {
+                const measureUrl = '/api/ping?t=' + (Date.now() + 1);
                 const startTime = performance.now();
                 fetch(measureUrl).then(() => {
                     const endTime = performance.now();
@@ -653,6 +655,9 @@ function generateHTML(data: TemplateData): string {
                     }
                     if (duration <= 0) duration = 1;
                     updateConnectionRttUI(duration, "HTTP/3");
+                }).catch(() => {
+                    // 测量失败时显示错误提示
+                    updateConnectionRttUI(0, "测量失败");
                 });
             });
         }
@@ -674,7 +679,7 @@ function generateHTML(data: TemplateData): string {
         let isModalOpen = false;
 
         const pingTargets = {
-            1: { name: '本站', url: window.location.pathname + '?act=ping', needCors: false },
+            1: { name: '本站', url: '/api/ping', needCors: false },
             2: { name: 'Blog', url: 'https://haokun.me/', needCors: true },
             3: { name: 'Bilibili', url: 'https://www.bilibili.com/favicon.ico', needCors: true },
             4: { name: 'Microsoft', url: 'https://www.microsoft.com/favicon.ico', needCors: true },
@@ -888,7 +893,8 @@ function generateHTML(data: TemplateData): string {
                 elAvg.textContent = '—';
 
                 var size = getSpeedSizeValue();
-                var url = window.location.pathname + '?act=speed_down&size=' + encodeURIComponent(size);
+                // M1 修复：使用新路由 /api/speed/download
+                var url = '/api/speed/download?size=' + encodeURIComponent(size);
                 var t0 = performance.now();
                 var total = 0;
                 var tMark = t0;
@@ -976,7 +982,8 @@ function generateHTML(data: TemplateData): string {
                     latency: document.getElementById('rtt-value').innerText.replace(/<[^>]*>/g, '').trim(),
                     node: '${nodeInfo.name} (${colo})'
                 };
-                const response = await fetch(window.location.pathname + '?act=analyze', {
+                // M1 修复：使用新路由 /api/analyze
+                const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(userInfo)
